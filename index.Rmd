@@ -1,0 +1,128 @@
+---
+title: "UndeRcoveR Data Science"
+output: 
+  html_document:
+    self-contained: true
+    includes:
+      in_header: "header.html" 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, 
+                      message = FALSE, 
+                      warning = FALSE)
+```
+
+
+```{css}
+
+@import url('https://fonts.googleapis.com/css?family=Inconsolata|Londrina+Solid&display=swap');
+
+
+h1, h2, h3{
+  font-family: 'Londrina Solid', cursive;
+}
+
+h2 {
+  font-size: 1.5em;
+}
+
+h3 {
+  color: #ffe599;
+}
+
+h4 {
+  font-family: 'Inconsolata', monospace;
+  font-weight: bold;
+}
+
+.btn-primary {
+  background-color: #ffe599;
+}
+
+.btn-primary:hover, .btn-primary:focus {
+  background-color: #ffe599;
+  opacity: 0.8;
+}
+
+.myButtonSelected {
+  background-color:#666666;
+}
+
+.myButtonSelected:hover, .myButtonSelected:focus{
+  background-color:#666666;
+}
+
+body, .btn{
+  font-family: 'Inconsolata', monospace;
+  font-size: 16px;
+}
+
+a {
+  color: #000000;
+  font-weight: bold;
+  background-color: #F0F0F0;
+}
+
+a:hover, a:focus {
+  color: #000000;
+  opacity: 0.8;
+}
+
+blockquote {
+  font-size: 16px;
+  background-color: #fff8e3;
+  padding: 10px;
+  color: #000000;
+}
+
+.highlight {
+  background-color: #fff8e3;
+}
+
+td {
+  padding: 10px;
+}
+
+tr {
+  border: solid #ddd 1px;
+}
+
+.center-align{ text-align:center;}
+```
+
+:::: {.row}
+
+::: {.col-md-4}
+
+![](udc_logo.png){style=width:200px}
+
+These [learnr](https://rstudio.github.io/learnr/) apps have been developed by [Anna Fergusson](https://www.stat.auckland.ac.nz/people/amar112), [Department of Statistics, University of Auckland](https://www.auckland.ac.nz/en/science/about-the-faculty/department-of-statistics.html) to support teaching and learning data science at the high school level.
+
+:::
+
+::: {.col-md-4}
+
+<div class="panel panel-default">
+  <div class="panel-body">
+  
+  [Google trends](google_trends/)
+  
+  </div>
+</div>
+
+:::
+
+::: {.col-md-4}
+
+<div class="panel panel-default">
+  <div class="panel-body">
+  
+  [Google eats](google_eats/)
+  
+  </div>
+</div>
+
+:::
+
+::::

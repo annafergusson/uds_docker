@@ -1,0 +1,282 @@
+---
+title: "UndeRcoveR data science"
+output: 
+  html_document:
+    df_print: paged
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(tidyverse)
+library(lubridate)
+library(stringr)
+library(glue)
+library(gtrendsR)
+library(patchwork)
+
+knitr::opts_chunk$set(echo = FALSE, 
+                      message = FALSE, 
+                      warning = FALSE)
+tutorial_options(exercise.timelimit = 60)
+
+# I think the stuff below means the previous code is not cached but ???
+options(tutorial.storage = list(
+  # save an arbitrary R object "data" to storage
+   save_object = function(tutorial_id, tutorial_version, user_id, object_id, data) {},
+  # retreive a single R object from storage
+  get_object = function(tutorial_id, tutorial_version, user_id, object_id) { 
+    NULL 
+  },
+  
+  # retreive a list of all R objects stored
+  get_objects = function(tutorial_id, tutorial_version, user_id) { 
+    list() 
+  },
+  
+  # remove all stored R objects
+  remove_all_objects = function(tutorial_id, tutorial_version, user_id) {
+  }
+))
+
+```
+
+```{css}
+
+@import url('https://fonts.googleapis.com/css?family=Inconsolata|Londrina+Solid&display=swap');
+
+.tutorialTitle:before {
+  content: url("images/STATS100-Cover-Logo_small.png");
+  display: block;
+}
+
+h1, h2, h3{
+  font-family: 'Londrina Solid', cursive;
+}
+
+h3 {
+  color: #f5af86;
+}
+
+h4 {
+  font-family: 'Inconsolata', monospace;
+  font-weight: bold;
+}
+
+.btn-primary {
+  background-color: #f5af86;
+}
+
+.btn-primary:hover, .btn-primary:focus {
+  background-color: #f5af86;
+  opacity: 0.8;
+}
+
+.myButtonSelected {
+  background-color:#666666;
+}
+
+.myButtonSelected:hover, .myButtonSelected:focus{
+  background-color:#666666;
+}
+
+body, .btn{
+  font-family: 'Inconsolata', monospace;
+  font-size: 16px;
+}
+
+a {
+  color: #000000;
+  font-weight: bold;
+  background-color: #F0F0F0;
+}
+
+a:hover, a:focus {
+  color: #000000;
+  opacity: 0.8;
+}
+
+blockquote {
+  font-size: 16px;
+  background-color: #fff8e3;
+  padding: 10px;
+  color: #000000;
+}
+
+.highlight {
+  background-color: #F0F0F0;
+}
+
+td {
+  padding: 10px;
+}
+
+tr {
+  border: solid #ddd 1px;
+}
+
+.center-align{ text-align:center;}
+```
+
+## Google eats
+
+> Is there an association between the price of food in NZ and people within NZ searching for food items on Google? Try out different food items in the app below and explore for yourself!
+
+```{r, context="data"}
+df_food_prices <- readRDS("food_data.rds")
+
+food_items <- df_food_prices %>%
+  pull(food) %>%
+  unique()
+```
+
+```{r, context="render"}
+textInput("search_term", "Google search term", "tomato")
+selectInput("food_name", "Food item", c("default"))
+actionButton("update_data", "Update plots")
+```
+
+```{r, context="server"}
+values <- reactiveValues(df_data = NULL,
+                         min_date = NULL,
+                         chart_title = NULL, 
+                         chart_subtitle = NULL, 
+                         chart_sources = NULL)
+
+observeEvent(input$update_data, {
+   showModal(modalDialog("Updating plots", footer=NULL))
+    google_search_term <- input$search_term
+    
+    trend_data <- gtrends(keyword = c(google_search_term),
+                          time = "all",
+                          geo = c("NZ"))
+    
+    if (!is.null(trend_data$interest_over_time))
+    {
+    poss_food <- df_food_prices %>%
+      filter(str_detect(str_to_lower(food), str_to_lower(google_search_term))) %>%
+      pull(food) %>%
+      unique()
+    
+    # check input box?
+    nz_food_item <- input$food_name
+    if (input$food_name == "default")
+    {
+      nz_food_item <- poss_food[1]
+    }
+    
+    # check if food item selected is on poss_food
+    if(!input$food_name %in% poss_food)
+    {
+      nz_food_item <- poss_food[1]
+    }
+  
+    updateSelectInput(
+      session,
+      "food_name",
+      choices = poss_food,
+      selected = nz_food_item
+    )
+    
+    # only select that food
+    df_specific_food <- df_food_prices %>%
+      filter(food == nz_food_item) %>%
+      mutate(series = "mean_food_price")
+
+    
+  search_data <- trend_data$interest_over_time 
+  missing_dates <- seq(ymd("2004-01-01"),
+                       floor_date(Sys.Date(),
+                                  "month"), 
+                       by="months")
+
+  if(length(missing_dates) > nrow(search_data))
+  {
+    missing_dates <- head(missing_dates, 
+                          -(length(missing_dates) - nrow(search_data)))
+  }
+
+  search_data$date <- missing_dates
+  
+  gt_index <- search_data %>%
+    select(date, hits) %>%
+    rename(value = hits) %>%
+    mutate(series = "google_search_interest")
+  
+  #min_date <- min(gt_index$date)
+  min_date <- ymd("2015-01-01")
+  
+  combined_data <- bind_rows(gt_index, df_specific_food)
+  food_data <- df_specific_food %>%
+    filter(date >= min_date)
+  
+  combined_data$series <- factor(combined_data$series, 
+                                 levels = c("mean_food_price",
+                                            "google_search_interest"))
+      
+    values$min_date <- min_date
+    values$df_data <- combined_data
+    values$chart_title <- glue::glue("The mean price of '{nz_food_item}' in NZ \ncompared to Google search interest for '{google_search_term}' in NZ")
+    values$chart_subtitle <- ""
+    values$chart_sources <- "Data sources: StatsNZ and Google trends via {gtrendsR}"
+    }
+    removeModal()
+  })
+
+output$time_plot <- renderPlot({
+  if (is.null(values$df_data)) return()
+  values$df_data %>%
+    filter(date >= values$min_date) %>%
+    ggplot(aes(x = date, 
+                  y = value, 
+                  group = series, 
+                  color = series)) +
+    geom_point() +
+    geom_line() +
+    facet_wrap(~series, scale = "free_y", ncol = 1) +
+    scale_x_date(date_breaks = "3 months",
+                 date_labels = "%b\n%y") +
+    guides(color = FALSE)  +
+    labs(title = values$chart_title,
+         subtitle = values$chart_subtitle,
+         caption = values$chart_sources,
+         x = "Month")
+})
+
+output$corr_plot <- renderPlot({
+  if (is.null(values$df_data)) return()
+  values$df_data %>%
+    select(date, series, value) %>%
+    spread(series, value) %>%
+    filter(date >= values$min_date,
+           !is.na(mean_food_price)) -> combined_data_re
+  
+  search_correlation <- cor(combined_data_re$google_search_interest, 
+      combined_data_re$mean_food_price, method = "spearman")
+  
+   p <- combined_data_re %>%
+    ggplot() +
+    geom_point(aes(google_search_interest, mean_food_price))  +
+    scale_x_continuous(breaks = seq(0, 100, 10)) +
+    annotate(geom = "label", 
+             label = glue("Rank correlation coefficent: {round(search_correlation, 2)}"), 
+             colour = "#666666",
+             x = Inf, 
+             y = Inf,
+             vjust = 1,
+             hjust = 1)  +
+    labs(title = values$chart_title,
+         subtitle = values$chart_subtitle,
+         caption = values$chart_sources) 
+  p + plot_spacer()
+})
+```
+
+```{r, context="render"}
+plotOutput("time_plot")
+```
+
+```{r, context="render"}
+plotOutput("corr_plot")
+```
+

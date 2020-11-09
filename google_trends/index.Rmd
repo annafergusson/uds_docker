@@ -1,0 +1,491 @@
+---
+title: "UndeRcoveR data science"
+output: 
+  learnr::tutorial:
+    progressive: TRUE
+    allow_skip: FALSE
+    df_print: paged
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(tidyverse)
+library(lubridate)
+library(stringr)
+library(glue)
+library(rvest)
+library(ggimage)
+library(gtrendsR)
+
+knitr::opts_chunk$set(echo = FALSE, 
+                      message = FALSE, 
+                      warning = FALSE)
+tutorial_options(exercise.timelimit = 90)
+
+# I think the stuff below means the previous code is not cached but ???
+options(tutorial.storage = list(
+  # save an arbitrary R object "data" to storage
+   save_object = function(tutorial_id, tutorial_version, user_id, object_id, data) {},
+  # retreive a single R object from storage
+  get_object = function(tutorial_id, tutorial_version, user_id, object_id) { 
+    NULL 
+  },
+  
+  # retreive a list of all R objects stored
+  get_objects = function(tutorial_id, tutorial_version, user_id) { 
+    list() 
+  },
+  
+  # remove all stored R objects
+  remove_all_objects = function(tutorial_id, tutorial_version, user_id) {
+  }
+))
+
+# some functions
+# using code/ideas from here https://www.hvitfeldt.me/blog/real-emojis-in-ggplot2/
+emoji_image <- function(x) {
+    paste0("https://emojipedia.org/", x) %>%
+    read_html() %>%
+    html_node('div[class="vendor-image"] img') %>%
+    html_attr("src")
+}
+
+```
+
+
+
+```{css}
+
+@import url('https://fonts.googleapis.com/css?family=Inconsolata|Londrina+Solid&display=swap');
+
+h1, h2, h3{
+  font-family: 'Londrina Solid', cursive;
+}
+
+h3 {
+  color: #f5af86;
+}
+
+h4 {
+  font-family: 'Inconsolata', monospace;
+  font-weight: bold;
+}
+
+.btn-primary {
+  background-color: #f5af86;
+}
+
+.btn-primary:hover, .btn-primary:focus {
+  background-color: #f5af86;
+  opacity: 0.8;
+}
+
+.myButtonSelected {
+  background-color:#666666;
+}
+
+.myButtonSelected:hover, .myButtonSelected:focus{
+  background-color:#666666;
+}
+
+body, .btn{
+  font-family: 'Inconsolata', monospace;
+  font-size: 16px;
+}
+
+a {
+  color: #000000;
+  font-weight: bold;
+  background-color: #F0F0F0;
+}
+
+a:hover, a:focus {
+  color: #000000;
+  opacity: 0.8;
+}
+
+blockquote {
+  font-size: 16px;
+  background-color: #f5af86;
+  padding: 10px;
+  color: #000000;
+}
+
+.highlight {
+  background-color: #F0F0F0;
+}
+
+td {
+  padding: 10px;
+}
+
+tr {
+  border: solid #ddd 1px;
+}
+
+.center-align{ text-align:center;}
+```
+
+```{js echo=FALSE}
+$(function() {
+var editor;
+$('.ace_editor').each(function( index ) {
+  editor = ace.edit(this);
+  editor.getSession().setUseWrapMode(true);
+  editor.setFontSize("16px");
+  });
+
+})
+```
+
+## Exploring Google trends data with R
+
+### Creating informative time series plots
+
+In this lab, you will learn how to make informative time series plots using the <a href="https://www.theta.co.nz/news-blogs/tech-blog/what-is-r/" target="blank">programming language R</a> and <a href="https://trends.google.com/trends/" target="blank">Google Trends</a> data.
+
+### Google eats?
+
+Watch this short video about how you can use Google to find recipes for different foods!
+
+![](https://youtu.be/IsUN1dUbbM8)
+
+### How do Google search trends compare between different countries?
+
+We can use data from <a href="https://trends.google.com/trends/" target="blank">Google Trends</a> to explore when people googled for different food items. 
+
+Below is a plot embedded from Google Trends, showing search interest **within NZ** for tomatoes across the last five years. It's interactive, so you can move your mouse/cursor over the graph and read information about each data point.
+
+<script type="text/javascript" src="https://ssl.gstatic.com/trends_nrtr/2213_RC01/embed_loader.js"></script> 
+
+<script type="text/javascript"> trends.embed.renderExploreWidget("TIMESERIES", {"comparisonItem":[{"keyword":"tomato","geo":"NZ","time":"today 5-y"}],"category":0,"property":""}, {"exploreQuery":"date=today%205-y&geo=NZ&q=tomato","guestPath":"https://trends.google.com:443/trends/embed/"}); </script> 
+
+The plot show seasonality (a repeating pattern, in this case one that repeats every 12 months), where search interest for tomatoes in NZ peaks around the start of each year (our summer).
+
+### Can we recreate this plot with code?
+
+We can get the Google Trends data about different search words using a R package called `{gtrendsR}`. A package is a collection of R code functions that someone else has written that we can use to do awesome things!
+
+> Run the code below. Then change the geo (country) from "NZ" to "US", and run the code again.
+
+```{r lab1plot, exercise = TRUE}
+data <- gtrends(keyword = "tomato",
+                geo = "NZ")
+
+trend_data <- data$interest_over_time %>%
+  mutate(date = as.Date(date),
+         hits = as.numeric(hits))
+  
+trend_data %>%
+  ggplot(aes(x = date, 
+             y = hits)) +
+  geom_line() +
+  labs(x = "Date (weekly)",
+       y = "Search interest")
+```
+
+### NZ vs US
+
+We can combine Google Trends data from two different countries by slightly changing the code. For the code I just gave you, the lines of code that determined which country to get data from were these ones:
+
+```{r one_country, echo=TRUE}
+data <- gtrends(keyword = "tomato",
+                geo = "NZ")
+```
+
+So we can get and compare data from NZ and the US, the code changes to this:
+
+```{r two_countries, echo=TRUE}
+data <- gtrends(keyword = "tomato",
+                geo = c("NZ", "US"))
+```
+
+So `"NZ"` has changed to `c("NZ", "US")`, which is how we tell `R` to look at a "list" of things, rather than just one thing. We do this by putting a `c()` around the list, and separating items in the list with a `,`. We've used `"` around the words because they are words, not numbers. 
+
+> Try running the code below to see how the NZ and US search interest for tomato compare on the same plot!
+
+```{r lab1compare, exercise = TRUE}
+data <- gtrends(keyword = "tomato",
+                geo = c("NZ", "US"))
+
+trend_data <- data$interest_over_time %>%
+  mutate(date = as.Date(date),
+         hits = as.numeric(hits))
+  
+trend_data %>%
+  ggplot(aes(x = date, 
+             y = hits,
+             group = geo,
+             colour = geo)) +
+  geom_line() +
+  labs(x = "Date (weekly)",
+       y = "Search interest")
+```
+
+Now we can compare the seasonality better, and also learn that for some reason, New Zealanders search for tomatoes at relatively higher rates than those from the US. 
+
+### Just a little bit about URL hacking
+
+What if we want to get the search interest for tomatoes for other countries? What are their codes?
+
+You can figure this out by paying attention to the URL (the web address) and noticing what changes in the URL when you change the country in <a href="https://trends.google.com/trends/?geo=US" target="blank">Google Trend</a>.
+
+![](images/google_country_codes.gif){style="width:100%"}
+
+You can also find a searchable list of all the two-letter country codes on the <a href="https://www.iso.org/obp/ui/#search" target="blank">ISO website</a>.
+
+> Adjust the code below to compare search interest for tomatoes between NZ and another country (not the US) and then run the code.
+
+```{r lab1C, exercise = TRUE}
+data <- gtrends(keyword = "tomato",
+                geo = c("NZ", "US"))
+
+trend_data <- data$interest_over_time %>%
+  mutate(date = as.Date(date),
+         hits = as.numeric(hits))
+  
+trend_data %>%
+  ggplot(aes(x = date, 
+             y = hits,
+             group = geo,
+             colour = geo)) +
+  geom_line() +
+  labs(x = "Date (weekly)",
+       y = "Search interest")
+```
+
+### Mini-challenge time {.tabset}
+
+Can you work out how to change the code below so you compare the search interest for `avocado` between Mexico, Japan and Spain?
+
+#### Try it out!
+
+```{r lab1D, exercise = TRUE}
+data <- gtrends(keyword = "tomato",
+                geo = c("NZ", "US"))
+
+trend_data <- data$interest_over_time %>%
+  mutate(date = as.Date(date),
+         hits = as.numeric(hits))
+  
+trend_data %>%
+  ggplot(aes(x = date, 
+             y = hits,
+             group = geo,
+             colour = geo)) +
+  geom_line() +
+  labs(x = "Date (weekly)",
+       y = "Search interest")
+```
+
+> How do the search trends compare? Which country has relatively higher rates of search interest for avocados?
+
+#### See an answer
+
+```{r threeway, echo=TRUE}
+data <- gtrends(keyword = "avocado",
+                geo = c("MX", "JP", "ES"))
+
+trend_data <- data$interest_over_time %>%
+  mutate(date = as.Date(date),
+         hits = as.numeric(hits))
+  
+trend_data %>%
+  ggplot(aes(x = date, 
+             y = hits,
+             group = geo,
+             colour = geo)) +
+  geom_line() +
+  labs(x = "Date (weekly)",
+       y = "Search interest")
+```
+
+### Optional extra
+
+We can also compare different groups/series, each with its own plot. We call this "subsetting" or "facetting". The code below shows how to do this using by adding `facet_wrap(~geo)`, and the resulting graphic!
+
+> Note, for this version we have kept the axis and scale the same for all the countries being compared, since the variable being used is a relative measure.
+
+```{r facetting, echo=TRUE}
+data <- gtrends(keyword = "avocado",
+                geo = c("NZ", "US", "AU"))
+
+trend_data <- data$interest_over_time %>%
+  mutate(date = as.Date(date),
+         hits = as.numeric(hits))
+  
+trend_data %>%
+  ggplot(aes(x = date, 
+             y = hits,
+             group = geo,
+             colour = geo)) +
+  geom_line() +
+  labs(x = "Date (weekly)",
+       y = "Search interest") +
+  facet_wrap(~geo)
+```
+
+### It's a plot but not that informative!
+
+One of the things that can help make a plot more informative is to provide good labels for the axes, a descriptive title and helpful subtitle, and to include a caption that explains where the data came from. We can add this information to our plot by using the `labs()` function. 
+
+> Run the code below and read the new labels that have been added to the plot. Then try changing words within the code below to change the labels that get printed on the plot.
+
+```{r lab1informative, exercise = TRUE, exercise.lines = 16}
+data <- gtrends(keyword = "egg",
+                geo = "NZ")
+
+trend_data <- data$interest_over_time %>%
+  mutate(date = as.Date(date),
+         hits = as.numeric(hits))
+  
+trend_data %>%
+  ggplot(aes(x = date, 
+             y = hits)) +
+  geom_line() +
+  labs(title = "Describe the plot here",
+       subtitle = "Give the date range here",
+       x = "Write the x-axis label here",
+       y = "Write the y-axis label here",
+       caption = "Source: Write where the data came from")
+```
+
+### A question of time ...
+
+We can also adjust the scales used (the numbers along the x and y axes) so that we can more easily read off values. 
+
+Since this is weekly data for the last five years, it would be nice to see where each year starts. In the code below `date_breaks = "12 months"` has been used to get the numbers of the axes to be spaced apart by 12 months.
+
+Remember, search interest is a relative measure and is always a number between 0 and 100. We can change the scale using the code `breaks = seq(0, 100, 20)`. This says 'Use numbers between 0 and 100 and space them 20 apart'.
+
+> Run the code below to see how these extra lines of code change the format of the plot. Then try changing the date breaks to be 24 months, and the numbers of the y-axis to be spaced 40 apart rather than 20. **NB: Neither of these suggestions are good ones in terms of making your plot more informative!**
+
+
+```{r lab1scales, exercise = TRUE, exercise.lines=16}
+data <- gtrends(keyword = "avocado",
+                geo = c("NZ"))
+
+trend_data <- data$interest_over_time %>%
+  mutate(date = as.Date(date),
+         hits = as.numeric(hits))
+  
+trend_data %>%
+  ggplot(aes(x = date, 
+             y = hits)) +
+  geom_line() +
+  labs(x = "Date (weekly)",
+       y = "Search interest") +
+  scale_x_date(date_breaks = "12 months",
+               date_labels = "%b\n%y") +
+  scale_y_continuous(breaks = seq(0, 100, 20))
+```
+
+### Colour my world!
+
+We will just cover a little bit about colour in this lab, and mostly let the theme we're using for out plots to allocate colours for us. One of the ways we can define a colour is by using a hex code. A hex code starts with a `#` and is followed by a combination of six letters or numbers e.g. `#d3d3d3`. There's lots of tools online to help you choose colours and get their hex codes - <a href="https://www.w3schools.com/colors/colors_picker.asp" target="blank">try this one out</a>. 
+
+> Run the code below. Then find a background colour you like, and then change the hex code below to change the background colour of the plot. I've chosen a lemon colour below to match the keyword lemon!
+
+```{r lab1colour, exercise = TRUE}
+data <- gtrends(keyword = "lemon",
+                geo = "NZ")
+
+trend_data <- data$interest_over_time %>%
+  mutate(date = as.Date(date),
+         hits = as.numeric(hits))
+  
+trend_data %>%
+  ggplot(aes(x = date, 
+             y = hits)) +
+  geom_line() +
+  labs(x = "Date (weekly)",
+       y = "Search interest") +
+  theme(panel.background = element_rect(fill = "#ffff99"))
+```
+
+
+### Just for fun! {.tabset}
+
+We can also play around with what we use as the points on the plot.
+
+> Run the code under each tab. Can you work out what was added to the `boring points` code to add points? Then try changing the `fun emojis` code to show search interest for kiwifruit using kiwifruit emoji!
+
+#### Adding boring points
+
+```{r lab1boring, exercise = TRUE}
+data <- gtrends(keyword = "egg",
+                geo = "NZ")
+
+trend_data <- data$interest_over_time %>%
+  mutate(date = as.Date(date),
+         hits = as.numeric(hits))
+  
+trend_data %>%
+  ggplot(aes(x = date, 
+             y = hits)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "Date (weekly)",
+       y = "Search interest")
+```
+
+#### Adding fun emojis
+
+```{r lab1fun, exercise = TRUE, exercise.lines=16}
+emoji <- emoji_image("egg")
+
+data <- gtrends(keyword = "egg",
+                geo = "NZ")
+
+trend_data <- data$interest_over_time %>%
+  mutate(date = as.Date(date),
+         hits = as.numeric(hits))
+  
+trend_data %>%
+  ggplot(aes(x = date, 
+             y = hits)) +
+  geom_line() +
+  geom_image(aes(image = emoji), size = 0.05) +
+  labs(x = "Date (weekly)",
+       y = "Search interest")
+```
+
+### Lab challenge!
+
+Your challenge is to create your own informative time series plot. For your plot, you need to:
+
+ + Use a keyword that is different from any of the examples used in the lab
+ + Compare search interest for two or more countries different from the examples used in the lab (i.e. not NZ or US)
+ + Create a plot that has informative labels
+ + Change the scales so that they are more helpful and clearer for reading values
+ + Change the background colour from white to another colour
+ 
+**You can do more than this if you want to, but you don't have to!**
+
+The code below will get you started on making an informative plot, but you will need to adjust it. <mark>Remember, you can scroll back up the page to see examples of how to make the changes!</mark>
+
+```{r lab1challenge, exercise = TRUE, exercise.lines = 25}
+data <- gtrends(keyword = "tomato",
+                geo = c("NZ", "US"))
+
+trend_data <- data$interest_over_time %>%
+  mutate(date = as.Date(date),
+         hits = as.numeric(hits))
+  
+trend_data %>%
+  ggplot(aes(x = date, 
+             y = hits,
+             group = geo,
+             colour = geo)) +
+  geom_line() +
+  labs(title = "YouTube searches for TikTok",
+       subtitle = "Daily search interest (1999 - 2001)",
+       x = "Write the x-axis label here",
+       y = "Search interest",
+       caption = "Source: Write where the data came from") +
+  scale_x_date(date_breaks = "24 months",
+               date_labels = "%b\n%y") +
+  scale_y_continuous(breaks = seq(0, 100, 1)) +
+  theme(panel.background = element_rect(fill = "#ffff99"))
+```
